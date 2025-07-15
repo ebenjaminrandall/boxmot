@@ -65,7 +65,7 @@ class BaseTracker(ABC):
             print("self.max_obs", self.max_obs)
 
     @abstractmethod
-    def update(self, dets: np.ndarray, img: np.ndarray, embs: np.ndarray = None) -> np.ndarray:
+    def update(self, dets: np.ndarray, img: np.ndarray, embs: np.ndarray = None, frame_rate: int = 30) -> np.ndarray:
         """
         Abstract method to update the tracker with new detections for a new frame. This method
         should be implemented by subclasses.
@@ -74,6 +74,7 @@ class BaseTracker(ABC):
         - dets (np.ndarray): Array of detections for the current frame.
         - img (np.ndarray): The current frame as an image array.
         - embs (np.ndarray, optional): Embeddings associated with the detections, if any.
+        - frame_rate (int): The frame rate for the current frame
 
         Raises:
         - NotImplementedError: If the subclass does not implement this method.
@@ -157,14 +158,14 @@ class BaseTracker(ABC):
         Decorator for the update method to handle per-class processing.
         """
 
-        def wrapper(self, dets: np.ndarray, img: np.ndarray, embs: np.ndarray = None):
+        def wrapper(self, dets: np.ndarray, img: np.ndarray, embs: np.ndarray = None, frame_rate: int = 30):
             # handle different types of inputs
             if dets is None or len(dets) == 0:
                 dets = np.empty((0, 6))
 
             if not self.per_class:
                 # Process all detections at once if per_class is False
-                return update_method(self, dets=dets, img=img, embs=embs)
+                return update_method(self, dets=dets, img=img, embs=embs, frame_rate=frame_rate)
             # else:
             # Initialize an array to store the tracks for each class
             per_class_tracks = []
@@ -186,7 +187,7 @@ class BaseTracker(ABC):
                 self.frame_count = frame_count
 
                 # Update detections using the decorated method
-                tracks = update_method(self, dets=class_dets, img=img, embs=class_embs)
+                tracks = update_method(self, dets=class_dets, img=img, embs=class_embs, frame_rate=frame_rate)
 
                 # Save the updated active tracks
                 self.per_class_active_tracks[cls_id] = self.active_tracks
@@ -200,7 +201,7 @@ class BaseTracker(ABC):
 
         return wrapper
 
-    def check_inputs(self, dets, img, embs=None):
+    def check_inputs(self, dets, img, embs=None, frame_rate=30):
         assert isinstance(
             dets, np.ndarray
         ), f"Unsupported 'dets' input format '{type(dets)}', valid format is np.ndarray"
@@ -210,6 +211,9 @@ class BaseTracker(ABC):
         assert (
             len(dets.shape) == 2
         ), "Unsupported 'dets' dimensions, valid number of dimensions is two"
+        assert isinstance(
+            frame_rate, int
+        ), f"Unsupported 'frame_rate' input format '{type(frame_rate)}', valid format is int"
 
         if embs is not None:
             assert (
