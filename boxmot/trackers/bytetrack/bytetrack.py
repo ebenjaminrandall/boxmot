@@ -125,7 +125,6 @@ class ByteTrack(BaseTracker):
         track_thresh (float, optional): Threshold for detection confidence. Detections above this threshold are considered for tracking in the first association round.
         match_thresh (float, optional): Threshold for the matching step in data association. Controls the maximum distance allowed between tracklets and detections for a match.
         track_buffer (int, optional): Number of frames to keep a track alive after it was last detected. A longer buffer allows for more robust tracking but may increase identity switches.
-        frame_rate (int, optional): Frame rate of the video being processed. Used to scale the track buffer size.
         per_class (bool, optional): Whether to perform per-class tracking. If True, tracks are maintained separately for each object class.
     """
 
@@ -135,7 +134,6 @@ class ByteTrack(BaseTracker):
         track_thresh: float = 0.45,
         match_thresh: float = 0.8,
         track_buffer: int = 25,
-        frame_rate: int = 30,
         per_class: bool = False,
     ):
         super().__init__(per_class=per_class)
@@ -151,14 +149,12 @@ class ByteTrack(BaseTracker):
         self.track_thresh = track_thresh
         self.match_thresh = match_thresh
         self.det_thresh = track_thresh
-        self.buffer_size = int(frame_rate / 30.0 * track_buffer)
-        self.max_time_lost = self.buffer_size
         self.kalman_filter = KalmanFilterXYAH()
 
     @BaseTracker.setup_decorator
     @BaseTracker.per_class_decorator
     def update(
-        self, dets: np.ndarray, img: np.ndarray = None, embs: np.ndarray = None
+        self, dets: np.ndarray, img: np.ndarray = None, embs: np.ndarray = None, frame_rate: int = 30
     ) -> np.ndarray:
 
         self.check_inputs(dets, img)
@@ -269,9 +265,11 @@ class ByteTrack(BaseTracker):
                 continue
             track.activate(self.kalman_filter, self.frame_count)
             activated_starcks.append(track)
+
         """ Step 5: Update state"""
+        max_time_lost =  int(frame_rate / 30.0 * self.track_buffer)
         for track in self.lost_stracks:
-            if self.frame_count - track.end_frame > self.max_time_lost:
+            if self.frame_count - track.end_frame > max_time_lost:
                 track.mark_removed()
                 removed_stracks.append(track)
 
